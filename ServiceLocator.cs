@@ -29,12 +29,10 @@ namespace LegendaryTools
                 throw new Exception("[ServiceLocator] -> You can only register service interfaces");
             }
             
-            if (servicesTable.ContainsKey(serviceType))
+            if (!servicesTable.TryAdd(serviceType, service))
             {
                 throw new Exception("[ServiceLocator] -> " + serviceType.Name + " is already registered.");
             }
-
-            servicesTable.Add(serviceType, service);
 
             if (onRegisterCallbacks.TryGetValue(serviceType, out List<Action<object>> callbacks))
             {
@@ -151,6 +149,23 @@ namespace LegendaryTools
             }
         }
 
+        public static void Dispose(bool triggerUnRegisterEvents = false)
+        {
+            foreach (KeyValuePair<Type, object> pair in servicesTable)
+            {
+                if (pair.Value is IDisposable disposableService)
+                {
+                    disposableService.Dispose();
+                }
+                if (triggerUnRegisterEvents && onUnregisterCallbacks.TryGetValue(pair.Value.GetType(), out List<Action<object>> callbacks))
+                {
+                    ExecuteCallbacks(callbacks, pair.Value);
+                }
+            }
+            
+            servicesTable.Clear();
+        }
+        
         private static void ExecuteCallbacks(List<Action<object>> callbacks, object instance)
         {
             for (int i = callbacks.Count - 1; i >= 0; i--)
